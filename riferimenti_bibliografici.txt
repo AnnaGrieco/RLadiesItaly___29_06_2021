@@ -1,0 +1,10 @@
+BIBLIOGRAFIA
+
+S. Rota Bulò, Appunti di Reti Neurali
+L. Cioni, Introduzione al Neural Computing
+M. Fischetti, Introduzione alla teoria delle Reti Neurali
+A. Johannet, B. Vayssade and D. Bertin; Neural Networks From Black Box towards Transparent Box - Application to Evapotranspiration Modeling
+L. Agantensi, STUDIO E SPERIMENTAZIONE DI CHARACTER-LEVEL CONVOLUTIONAL NEURAL NETWORKS PER LA SENTIMENT CLASSIFICATION
+A. Fabbri, Reti neurali in ambito finanziario
+G. Di Giusto, BARRIERE LINGUISTICHE E INTELLIGENZA ARTIFICIALE: ASPETTI TEORICI E CASI APPLICATIVI
+F. Günther, S. Fritsch; neuralnet: Training of Neural Networks

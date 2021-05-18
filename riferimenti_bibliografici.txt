@@ -1,4 +1,4 @@
-# BIBLIOGRAFIA
+BIBLIOGRAFIA
 
 S. Rota Bulò, Appunti di Reti Neurali
 L. Cioni, Introduzione al Neural Computing

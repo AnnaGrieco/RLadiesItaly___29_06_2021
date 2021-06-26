@@ -1,0 +1,1574 @@
+---
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+---
+# WINE CLASSIFICATION 
+
+Dataset: https://archive.ics.uci.edu/ml/datasets/Wine
+
+Il dataset colleziona le informazioni riguardanti 177 vini,  prodotti da tre cantine differenti a partire da uve coltivate nella stessa regione italiana.
+
+Per ciascuna osservazione sono state rilevate 13 proprietà fisiche e biochimiche e la cantina di riferimento. 
+
+Lo scopo di questo studio è costruire una Artificial Neural Network che sia in grado di classificare da quale cantina provenga ciascun vino.
+
+```{r}
+install.packages("ggplot2")
+install.packages("gridExtra")
+install.packages("ggbiplot")
+install.packages("plotly")
+install.packages("nnet")
+install.packages("outliers")
+install.packages("neuralnet")
+install.packages("NeuralNetTools")
+install.packages("vip")
+install.packages("dplyr")
+```
+
+
+# INDEX
+
+
+* LOAD DATA
+* EXPLORE AND VISUALIZE DATA
+* PRINCIPAL COMPONENT ANALYSUS FOR VISUALIZATION
+* TARGET ENCODING
+* FEATURE STANDARDIZATION
+* OUTLIERS
+* SPLIT DATA IN TRAIN AND TEST SET
+* NEURAL NETWORK MODEL
+* FEATURE IMPORTANCE
+* PREDICTIONS
+* EVALUATION
+
+
+
+# LOAD DATA
+
+```{r}
+data = read.csv('C:\\Users\\Grieco Anna\\Desktop\\wine.data')
+View(data)
+dim(data)
+head(data)
+```
+
+```{r}
+names(data)<-c("cantina","gradaz","acido","ceneri","alcal","magn","fenoli","flav","non_flav","proanto", "intens","tonal","purez","prol")
+data$cantina <- as.factor (data$cantina)
+str(data)
+summary(data)
+```
+**wine.data structure:**
+
+- **cantina** : cantina che ha prodotto il vino;
+- **gradazione alcolica** : è la percentuale alcoolica sul volume del vino(%);
+- **acido malico** : è un acido contenuto nell'uva(grammi/litro);
+- **ceneri** : sostanze minerali misurate in millisiemens per centimetro;
+- **alcalinita delle ceneri** : alcalinità delle sostanze minerali, che incide sulla sapidità del vino;
+- **magnesio** : quantità di magnesio presente nel vino (g su kg);
+- **fenoli** :  numero totale di fenoli(mg/L), sostanze naturali responsabili del colore e delle sensazioni gustative; 
+- **flavonoidi** : tipologia di polifenoli molto abbondanti nel vino(mg/L);
+- **non flavonoidi** : prodotti durante la vinificazione e le fermentazione, conferiscono aroma al vino(mg/L);
+- **proantocianidine** : fenolo antiossidante tipico del vino rosso(mg/L);
+- **intensità di colore** : misura quanto il vino sia scuro;
+- **tonalità di colore** : misura la proprietà di colore del vino;
+- **purezza** : misurata come rapporto fra  OD280/OD315, si riferisce alla purezza delle proteine;
+- **prolina** : aminoacido (mg/L). 
+
+
+
+
+
+##### Missing
+
+```{r}
+which(is.na(data))
+```
+
+
+# EXPLORE AND VISUALIZE DATA
+
+```{r}
+require(ggplot2)
+require(gridExtra)
+```
+Per ogni feature osservo due grafici che assieme danno una panoramica completa di dispersione, forma distributiva, outliers, simmetria e variabilità dei dati.
+
+**1. BOXPLOT** 
+
+  Il “box and whiskers plot” è un “diagramma a scatola e baffi”  molto utile per cogliere due aspetti di ciascuna feature: dispersione e outliers.
+  
+  La "scatola" è un quadrilatero in cui:
+  
+  - l'altezza rappresenta la differenza interquatrilica(Q3-Q1) quindi racchiude il 50% dei dati, 
+  - in corrisponenda dei due estremi dell'altezza si possono leggere il Q1 e il Q3,
+  - la linea orizzonatale all'interno della scatola corrisponde alla mediana.
+  
+  I "baffi" invece forniscono una misura della dispersione dei valori che non rientrano nella IQR e che NON sono anomali.
+  
+  - La coda superiore corrisponde alla coda destra e quella inferiore a quella sinistra.
+  - Le due code terminano con l'estremo superiore/inferiore che NON è un valore anomalo.
+  - Gli outliers possono essere identificati come i punti al sopra e/o al di sotto dei baffi.
+  
+  
+
+**2. ISTOGRAMMA**
+
+L’istogramma aiuta nell'esplorazione di una serie di elementi: 
+
+- il punto centrale di una variabile, 
+- la variabilità nei dati, 
+- eventuali valori anomali,
+- simmetria. 
+
+Nell’istogramma, la base dei rettangoli è proporzionale all’ampiezza della classe, invece l’altezza alla densità di frequenza; 
+quindi, l’area dei rettangoli è proporzionale al numero dei casi della classe.
+
+
+
+
+##### gradazione
+
+```{r}
+gradaz_box <-
+  ggplot (data, aes(x=cantina,y=gradaz, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di gradazione") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "gradazione")
+
+gradaz_hist <-
+ggplot(data) +
+  aes(x = gradaz ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di gradazione") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "gradazione",
+     y = "frequenza")
+
+grid.arrange(gradaz_box,gradaz_hist,nrow=1)
+```
+
+
+ 
+##### acido malico
+
+```{r}
+acido_box <-
+ggplot (data, aes(x=cantina,y=acido, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di acido malico") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "acido malico")
+
+acido_hist <-
+ggplot(data) +
+  aes(x = acido ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di acido malico ") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "acido malico",
+     y = "frequenza")
+
+grid.arrange( acido_box, acido_hist, nrow=1)
+```
+
+##### ceneri
+
+```{r}
+ceneri_box <-
+ggplot (data, aes(x=cantina,y=ceneri, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di ceneri") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "ceneri")
+
+ceneri_hist <-
+ggplot(data) +
+  aes(x = ceneri ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di ceneri") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "ceneri",
+     y = "frequenza")
+
+grid.arrange( ceneri_box, ceneri_hist, nrow=1)
+```
+
+##### alcalinità ceneri
+
+```{r}
+alcal_box <-
+ggplot (data, aes(x=cantina,y=alcal, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di alcalinità ceneri") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "alcalinità ceneri")
+
+alcal_hist <-
+ggplot(data) +
+  aes(x = alcal ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di alcalinità ceneri") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "alcalinità ceneri",
+     y = "frequenza")
+
+grid.arrange( alcal_box, alcal_hist, nrow=1)
+```
+
+##### magnesio
+
+```{r}
+magn_box <-
+ggplot (data, aes(x=cantina,y=magn, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di magnesio") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "magnesio")
+magn_hist <-
+ggplot(data) +
+  aes(x = magn ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di magnesio") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "magnesio",
+     y = "frequenza")
+
+grid.arrange( magn_box, magn_hist, nrow=1)
+```
+
+
+
+##### fenoli
+
+```{r}
+fenoli_box <-
+ggplot (data, aes(x=cantina,y=fenoli, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di fenoli") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "fenoli")
+
+fenoli_hist <-
+ggplot(data) +
+  aes(x = fenoli ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di fenoli") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "fenoli",
+     y = "frequenza")
+
+grid.arrange( fenoli_box, fenoli_hist, nrow=1)
+```
+
+##### flavonoidi
+
+```{r}
+flav_box <-
+ggplot (data, aes(x=cantina,y=flav, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di flavonoidi") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "flavonoidi")
+
+flav_hist <-
+ggplot(data) +
+  aes(x = flav ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di flavonoidi") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "flavonoidi",
+     y = "frequenza")
+
+grid.arrange( flav_box, flav_hist, nrow=1)
+```
+
+##### non flavonoidi
+
+```{r}
+non_flav_box <-
+ggplot (data, aes(x=cantina,y=non_flav, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di non flavonoidi") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "non flavonoidi")
+
+non_flav_hist <-
+ggplot(data) +
+  aes(x = non_flav ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di non flavonoidi") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "non flavonoidi",
+     y = "frequenza")
+
+grid.arrange( non_flav_box, non_flav_hist, nrow=1)
+```
+
+##### proantocianidine
+
+```{r}
+proanto_box <-
+ggplot (data, aes(x=cantina,y=proanto, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati proantocianidine") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "proantocianidine")
+
+proanto_hist <-
+ggplot(data) +
+  aes(x = proanto ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma proantocianidine") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "proantocianidine",
+     y = "frequenza")
+
+grid.arrange( proanto_box, proanto_hist, nrow=1)
+```
+
+
+
+##### intensità colore
+
+```{r}
+intens_box <-
+ggplot (data, aes(x=cantina,y=intens, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di intensità colore") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "intensità colore")
+
+intens_hist <-
+ggplot(data) +
+  aes(x = intens ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di intensità colore") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "intensità colore",
+     y = "frequenza")
+
+grid.arrange( intens_box, intens_hist, nrow=1)
+```
+
+##### tonalità colore
+
+```{r}
+tonal_box <-
+  ggplot (data, aes(x=cantina,y=tonal, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di tonalità colore") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "tonalità colore")
+
+tonal_hist <-
+  ggplot(data) +
+  aes(x = tonal ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di tonalità colore") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "tonalità colore",
+     y = "frequenza")
+
+grid.arrange(tonal_box,tonal_hist,nrow=1)
+```
+
+##### purezza
+
+```{r}
+purez_box <-
+ggplot (data, aes(x=cantina,y=purez, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di purezza") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "purezza")
+
+purez_hist <-
+ggplot(data) +
+  aes(x = purez ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di purezza") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "purezza",
+     y = "frequenza")
+
+grid.arrange( purez_box, purez_hist, nrow=1)
+```
+
+##### prolina
+
+```{r}
+prol_box <-
+  ggplot (data, aes(x=cantina,y=prol, group=cantina, color=cantina))  + 
+  geom_boxplot() + 
+  geom_jitter() +
+  ggtitle("Boxplot condizionati di prolina") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs (caption = "dati:data",
+     x = "cantina",
+     y = "prolina")
+
+prol_hist <-
+ggplot(data) +
+  aes(x = prol ) +
+  geom_histogram(bins = 30L, fill = "firebrick2", color = "firebrick4" ) +
+  theme_minimal()+
+   ggtitle("Istogramma di prolina") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "prolina",
+     y = "frequenza")
+
+grid.arrange( prol_box, prol_hist, nrow=1)
+```
+
+
+
+
+Osservazioni:
+
+  - alcune features(ad es. ceneri e magnesio), non distinguono in modo netto le tre cantine;
+  - distribuzioni, tranne alcune eccezioni, abbastanza centrate sulla media;
+  - ci sono outliers in pressocchè tutte le distribuzioni, ma rimando la gestione degli outliers a seguito della standardizzazione.
+
+
+
+# PRINCIPAL COMPONENT ANALYSIS FOR VISUALIZATION
+
+
+### Correlation Matrix
+
+Per poter svolgere una corretta analisi delle componenti principali su un set di dati numerici, è indispensabile che esista una correlazione, seppur minima, 
+tra le features; perchè la PCA si basa proprio sulla varianza comune tra le variabili.
+
+```{r}
+corr.matrix <-as.matrix (round(cor(cbind
+                        (data$gradaz,data$acido,data$ceneri,data$alcal,data$magn,data$fenoli,data$flav,data$non_flav,
+                         data$proanto,data$intens,data$tonal,data$purez,data$prol)),2))
+
+colnames(corr.matrix) <- c("gradaz", "acido", "ceneri", "alcal", "magn", "fenoli", "flav", "non_flav","proanto",
+                           "intens","tonal","purez","prol")
+
+rownames(corr.matrix) <- c("gradaz","acido","ceneri","alcal","magn","fenoli","flav","non_flav","proanto",
+                           "intens","tonal","purez","prol")
+
+corr.matrix
+```
+
+```{r}
+# 169 correlazioni, intervallo di confidenza, p value associato al test t di significatività e gradi di libertà n-2
+corr.m<-function(matrice) 
+             {
+             tblcols<-expand.grid(1:ncol(matrice),1:ncol(matrice))
+             tblcols$name1<-colnames(matrice)[tblcols$Var1]
+             tblcols$name2<-colnames(matrice)[tblcols$Var2]
+             cfunc <- function(matr,var1, var2) {
+             rbind(as.matrix(cor.test(matr[,var1], matr[,var2], method="pearson")
+             [c(1:4)]),as.matrix(cor.test(matr[,var1], matr[,var2], method="pearson")$conf.int[1:2]))
+             }
+             test<-mapply(function(a,b) 
+             {
+             cfunc(matr=data[2:14], var1 = a, var2 = b)
+             }, 
+             tblcols$Var1, tblcols$Var2)
+             RNM<-c("t", "df","p-value","corr","lwr","upr")
+             CNM<-paste(as.character(tblcols$name1), "-",as.character(tblcols$name2))
+             rownames(test)<-RNM
+             colnames(test)<-CNM
+             t(test)
+}
+head(corr.m(data[2:14]))
+tail(corr.m(data[2:14]))
+```
+
+
+### Principal Component Analysis
+
+```{r}
+pca <- princomp(data[2:14], scores = TRUE, cor=TRUE)
+# scores=TRUE calcola i punteggi delle n osservazioni per le componenti principali, cor=TRUE stardardizza data[2:14] perchè ci sono differenze di unità di misura
+summary(pca)
+```
+
+La summary di PCA mostra nell'ordine:
+
+- errore standard, delle componenti, cioè le radici degli autovalori(in ordine decrescente);
+- la quota di variabilità spiegata da ogni componente principale(ottenuta dividendo ogni autovalore per la somma di tutti gli autovalori);
+- la variabilità cumulata spiegata dalle componenti, che ci aiuta a decidere quante componenti principali scegliere in base alla percentuale di variabilità spiegata obiettivo.
+
+
+```{r}
+plot(pca, main = "PCA - wine", col="mediumaquamarine")
+```
+
+### Principal Components & Features
+
+```{r}
+pca$loadings 
+```
+I *loadings* sono coefficienti che spiegano la relazione tra le features e le componenti principali.
+
+La proporzionalità diretta/inversa si può intuire dal segno positivo/negativo; mentre i campi vuoti sono trascurabili.
+
+Ad esempio, la Comp.1 è:
+
+- positivamente correlata in modo più intenso con flavonoidi e fenoli, ma anche con purezza, tonalità colore, proantocianidine e prolina;
+- negativamente correlata con non flavonoidi, acido malico e alcalinità ceneri;
+- invece la relazione tra ceneri e intensità colore è trascurabile.
+
+
+
+```{r}
+library(ggbiplot)
+ggbiplot(pca, circle = TRUE, groups = data$cantina, ellipse = TRUE)
+```
+
+
+
+**Osservazioni:**
+
+* sugli assi cartesiani ci sono le due componenti principali che di daefaul sono la 1 e la 2(choices=c() permette di cambiare le componenti);
+* i punti sono gli scores quindi gli n valori calcolati sulle componenti principali, colorati in base alla cantina di appartenenza;
+* le frecce rappresentano le features, in particolare:
+    - lunghezza delle frecce indica la potenza delle variabili espressa con i _loadings_;
+    - più le frecce sono vicine agli assi cartesiani(=le componenti principali) più sono correlate con la rispettiva PC;
+    - frecce vicine segnalano che le corrispondenti features sono correlate fra di loro;
+    - l'orientamento del verso delle frecce, quindi se puntano su valori positivi o negativi, esprime la relazione diretta/inversa tra la feature a la principal component;
+* circle=TRUE disegna un cerchio a partire dal centro della PCA,quindi è utile per confrontare la lunghezza delle frecce;
+* ellipse = TRUE aiuta ad individuare i gruppi del target.
+
+Quindi, ad esempio, da questo grafico possiamo dedurre che fenoli, proantocianidine e flavonoidi sono correlate,
+che anche non flavonoidi e alcalinità cenere sono correlate, che i loadings assumono valori molto simili per tutte le features ecc...
+
+
+Si può analizzare la **relazione** tra ciascuna PC e ciascuna feature tramite uno scatterplot e una semplice misura di correlazione.
+Ad esempio, considero la Comp.1 e la features flavonoidi con cui, dall'analisi dei loadings, è emerso esserci la relazione più intensa.
+
+```{r}
+cor(pca$scores[,1],data$flav)
+plot(pca$scores[,1],data$flav,col="violet",pch=16, xlab="Comp.1", ylab="flavonoidi", main="Comp.1 e flavonoidi  -  cor = 0.9178892")
+```
+
+
+# PCA - VISUALIZATION
+
+
+```{r}
+require(plotly)
+plot <- ggplot(data, aes(x= pca$scores[,1] , y= pca$scores[,2] , group=cantina, color=cantina )) +
+  geom_point(alpha=1.0) +
+   ggtitle("Scatterplot del target cantina secondo le Component Principali 1 e 2") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs ( caption = "dati:data",
+     x = "C1: tutte le features tranne ceneri e intens",
+     y = "C2: grad,acido,ceneri,magn,inten,tonal,purez,prol") 
+  theme_bw()
+
+ggplotly(plot) 
+```
+
+Le prime due principal components aiutano a visualizzare il raggruppamento del target e quindi l'esistenza di una relazione non lineare che potrà essere approssimata e spiegata molto bene dalla Neural Network.
+
+
+
+
+# TARGET ENCODING
+
+Prima di tutto, codifichiamo la  variabile target perchè è un factor con tre livelli: 1,2 e 3.
+
+La codifica è indispensabile perchè le ANN non rispondo bene con dati categorici.
+Il pacchetto nnet fornisce class.ind() che svolge l'encoding del target.
+
+```{r}
+require(nnet)
+data_cleaned <- as.data.frame (cbind(data[, 2:14], class.ind(as.factor(data$cantina))))
+names(data_cleaned) <- c(names(data)[2:14],"a","b","c")
+```
+
+```{r}
+head(data_cleaned)
+dim(data_cleaned)
+```
+
+
+# FEATURES STANDARDIZATION
+
+La standardizzazione, o trasformazione in punti z, è un’operazione molto utile quando vogliamo
+confrontare fra loro dati raccolti in condizioni diverse o espressi in unità di misura diverse.
+
+La standardizzazione esprime i dati in unità di deviazione standard e come posizione rispetto alla media.
+La funzione f è costruita a questo scopo, ma si può utilizzare direttamente scale().
+
+
+```{r}
+f <- function(x){ (x - mean(x))/(sd(x)) }
+data_cleaned[, 1:13] <- as.data.frame(lapply(data_cleaned[, 1:13], f))
+head(data_cleaned)
+```
+
+##### Mean = 0
+```{r}
+summary(data_cleaned[1:13])
+```
+##### Var = 1
+```{r}
+diag(var(data_cleaned[,1:13]))
+```
+
+
+# OUTLIERS
+
+```{r}
+require(outliers)
+```
+### Grubbs test
+
+Il test di Grubbs risponde alla domanda: _"Il valore più alto/basso di una distribuzione univariata e approssimamente normale è anomalo?"_
+
+La statistica test esprime lo scostamento massimo dalla media campionaria in unità di deviazione standard.
+
+Il test di Grubbs non è appropriato per n≤6.
+
+
+**VERIFICA D'IPOTESI SUL MAX DELLA DISTRIBUZIONE** 
+
+_Sistema d'ipotesi_
+
+    H0: il max NON è un valore anomalo
+
+    H1: il max è un valore anomalo
+
+_Statistica test_
+
+    G = (max(feature) - mean(feature)) / sd(feature)
+
+
+**SISTEMA DI IPOTESI PER IL MIN DELLA DISTRIBUZIONE**
+
+_Sistema d'ipotesi_
+
+    H0: il min NON è un valore anomalo
+
+    H1: il min è un valore anomalo
+
+_Statitica test_
+
+    G = (mean(feature) - min(feature)) / sd(feature)
+
+
+**OUTPUT DEL TEST DI GRUBBS**
+
+_Grubbs test for one outlier_
+
+    data -> distribuzione univariata e approssimativamente normale
+
+    G -> statistica test di Grubbs
+
+    U -> "upper", valore critico(calcolato sulla base di: t, df, n, α) per accettare/rifiutare H0
+
+    p-value -> livello di significatività(default α = 0,05)
+
+
+**REGOLA DI DECISIONE**
+
+    Accetto H0 se G < U 
+
+    Accetto H0 se p > α 
+
+
+
+### QQ PLOT
+
+Controllo la normalità delle features standardizzate tramite dei QQ Plot.
+
+Il QQ Plot confronta i valori teorici di una distribuzione normale sull'asse delle ascisse, con i valori campionati della distribuzione oggetto d'interesse sull'asse delle ordinate.
+
+I valori rappresentati sono frequenze cumulate.
+
+La distribuzione analizzata, si ritiene normale quanto più i punti si distribuiscono lungo la bisettrice del quadrante.
+
+```{r}
+library(ggplot2)
+```
+
+
+```{r}
+# gradazione
+ggplot(data_cleaned, 
+       aes(sample=gradaz)) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di gradazione") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+```{r}
+# acido malico
+ggplot(data_cleaned, 
+       aes(sample= acido )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di acido malico") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# ceneri
+ggplot(data_cleaned, 
+       aes(sample= ceneri )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di ceneri") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# alcalinità ceneri
+ggplot(data_cleaned, 
+       aes(sample= alcal)) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di alcalinità ceneri") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+
+
+```{r}
+# magnesio
+ggplot(data_cleaned, 
+       aes(sample= magn )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di magnesio") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# fenoli
+ggplot(data_cleaned, 
+       aes(sample= fenoli )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di fenoli") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# flavonoidi
+ggplot(data_cleaned, 
+       aes(sample= flav )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di flavonoidi") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# non flavonoidi
+ggplot(data_cleaned, 
+       aes(sample= non_flav )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di non flavonoidi") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# proantocianidine
+ggplot(data_cleaned, 
+       aes(sample= proanto )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di proantocianidine") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# intensità colore
+ggplot(data_cleaned, 
+       aes(sample= intens )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di intensità colore") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+
+
+```{r}
+# tonalità colore
+ggplot(data_cleaned, 
+       aes(sample= tonal )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di tonalità colore") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# purezza
+ggplot(data_cleaned, 
+       aes(sample= purez )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di purezza") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+```{r}
+# prolina
+ggplot(data_cleaned, 
+       aes(sample= prol )) +
+       stat_qq() +
+       stat_qq_line() + 
+       ggtitle("QQ Plot di prolina") +
+       theme(plot.title = element_text(hjust = 0.5)) +
+       labs ( caption = "dati:data_cleaned",
+       x = "theoretical",
+       y = "sample") +
+       theme_bw() 
+```
+
+
+I QQ Plot mostrano distribuzioni normali ed alcune distribuzioni approssimativamente normali.
+
+Poichè per applicare Grubbs l'ipotesi di normalità non è stringente, posso procedere con il test. 
+
+
+
+#### gradazione
+```{r}
+grubbs.test(data_cleaned$gradaz)
+grubbs.test(data_cleaned$gradaz, opposite = TRUE)
+```
+#### acido malico
+```{r}
+grubbs.test(data_cleaned$acido)
+grubbs.test(data_cleaned$acido, opposite = TRUE)
+```
+#### ceneri 
+```{r}
+grubbs.test(data_cleaned$ceneri)
+grubbs.test(data_cleaned$ceneri, opposite = TRUE)
+```
+#### alcalinità ceneri
+```{r}
+grubbs.test(data_cleaned$alcal)
+grubbs.test(data_cleaned$alcal, opposite = TRUE)
+```
+#### magnesio
+```{r}
+grubbs.test(data_cleaned$magn)
+grubbs.test(data_cleaned$magn, opposite = TRUE)
+```
+#### fenoli
+```{r}
+grubbs.test(data_cleaned$fenoli)
+grubbs.test(data_cleaned$fenoli, opposite = TRUE)
+```
+#### flavanoidi
+```{r}
+grubbs.test(data_cleaned$flav)
+grubbs.test(data_cleaned$flav, opposite = TRUE)
+```
+#### non flavanoidi
+```{r}
+grubbs.test(data_cleaned$non_flav)
+grubbs.test(data_cleaned$non_flav, opposite = TRUE)
+```
+#### proantocianidine
+```{r}
+grubbs.test(data_cleaned$proanto)
+grubbs.test(data_cleaned$proanto, opposite = TRUE)
+```
+#### intensità colore
+```{r}
+grubbs.test(data_cleaned$intens)
+grubbs.test(data_cleaned$intens, opposite = TRUE)
+```
+#### tonalità colore
+```{r}
+grubbs.test(data_cleaned$tonal)
+grubbs.test(data_cleaned$tonal, opposite = TRUE)
+```
+#### purezza
+```{r}
+grubbs.test(data_cleaned$purez)
+grubbs.test(data_cleaned$purez, opposite = TRUE)
+```
+#### prolina
+```{r}
+grubbs.test(data_cleaned$prol)
+grubbs.test(data_cleaned$prol, opposite = TRUE)
+```
+
+I test e i relativi livelli di significatività confermano che standardizzazione ha mitigato gli outliers.
+
+
+
+
+# SPLIT DATA IN TRAIN E TEST SET
+
+Per la riproducibilità del codice, fisso il seme e divido il dataset per il 70% in Training Set e per il restante 30% in Test Set.
+
+```{r}
+set.seed(123)
+index = sample(1:nrow(data_cleaned),round(0.7*nrow(data_cleaned)))
+train <- as.data.frame(data_cleaned[index,])
+test <- as.data.frame(data_cleaned[-index,])
+```
+
+
+```{r}
+dim(train)
+dim(test)
+dim(data_cleaned)
+```
+
+
+# NEURAL NETWORK MODEL
+
+
+#### Model
+
+```{r}
+set.seed(123)
+require(neuralnet)
+nn <- neuralnet( (a + b + c) ~ .,
+                 data = train, 
+                 act.fct = "logistic",
+                 hidden = c(13, 3, 3),
+                 linear.output = FALSE,
+                 lifesign = 'minimal',
+                 likelihood = TRUE )
+```
+Il modello di rete neurale è un *MULTILAYER PERCEPTRON*, vediamone le principali caratteristiche:
+
+ * la formula 
+ * act.fct = "logistic" perchè si adatta ai problemi classificazione
+ * i layers della rete sono 13, 3 e 3.
+     - 13 sono le features, 
+     - 3 sono gli hidden layers, 
+     - 3 sono i livelli del target.
+   13 e 3 si possono anche omettere perchè sono impostati di default dalla funzione neuralnet.
+   Per quanto riguarda invece gli hidden, non esiste ancora un criterio condiviso in letteratura per scegliere gli strati nascosti con una regola generale; 
+   quindi, dopo alcuni tentativi, ho scelto 3 hidden layers valutando le prestazioni migliori delle rete.
+   Se gli hidden non vengono specificati, il default è 1. In questo studio l'impostazione di default restituiva error: 16.47238;
+ * linear.output = FALSE perchè è una classificazione, TRUE va bene invece per le regressioni;
+ * lifesign = 'minimal' serve ad avere l'output in rosso sotto al chunck del modello,
+ * likelihood = TRUE, in modo che vengano calcolati i criteri di informazione.
+
+
+**result.matrix** è un vettore che sintetizza le informazioni più importanti della rete:
+
+ - l'errore 0.01554;
+ - sono stati necessari 85 step affinchè le derivate parziali della soglia di errore raggiungessero il livello prestabilito di 0.01(default);
+ - i criteri di informazione di Akaike:496 e Bayesiano:1195 ;
+ - i pesi stimati ad ogni ripetizione oscillano tra [ -9.97 , +9.86 ];
+ - le prime inizializzazioni hanno coinvolto le features: gradazione, acido malico e ceneri;
+ - il primo valore di intercetta è -6.73 poi -7.99.
+ 
+
+```{r}
+nn$result.matrix
+```
+
+Gli **start weights** sono i valori utilizzati per inizializzare il modello. 
+
+L'impostazione utilizzata è quella di default, startweights = NULL, che utilizza numeri casuali.
+
+```{r}
+nn$startweights
+```
+
+
+#### Plot
+
+Rappresentazione grafica della rete neurale con l'errore minore.
+
+```{r}
+plot(nn,rep="best")
+```
+
+I **nodi** della prima colonna sono le 13 variabili in input.
+
+Le **frecce in nero** riportanoi pesi generalizzati, che esprimono quanto quella variabile contribuisce al nodo successivo.
+
+Le **frecce in blu** mostrano l'errore aggiunto in ogni passaggio.
+
+Le tre **colonne centrali** sono i 3 hidden layers, ogni colonna ha minimo 3 nodi perchè 3 sono i livelli del target.
+
+Il primo hidden ha 13 nodi, il secondo e il terzo 3 nodi.
+
+I **nodi** dell'ultima colonna indicano i tre livelli di output finale.
+
+
+
+# FEATURES IMPORTANCE
+
+Il plot non da modo di cogliere quali siano le features che apportano maggiore contributo alla previsione del target,ma si possono utilizzare due metodi per individuare le variabili più esplicative del modello:
+
+ 1. analisi dei generalized weights,
+ 2. algoritmi di Garson e Olden.
+ 
+ 
+
+### 1. GENERALIZED WEIGHTS ANALYSIS
+
+```{r}
+nn$generalized.weights
+```
+
+Ciascun **generalized weight** ha un'interpretazione analoga al parametro di un modello di regressione. 
+
+Se i pesi generalizzati di una variabile sono approssimativamente nulli, si ritiene che la feature non abbia alcun effetto significativo sul target. 
+
+Il peso generalizzato della i-esima feature si ottiene, infatti, come derivata parziale della funzione log-odds rispetto alla variabile i-esima di interesse. 
+
+
+In questo caso, la rete è addestrata con 13 features e 3 hidden layers, quindi 39 colonne di generalized.weights per ciascuna delle 124 osservazioni dei Training Set.
+
+
+
+
+Più che provare ad interpretare i GW leggenoli dalla tabella, è più utile visualizzarli tramite il _generalized weight plot_.
+
+La funzione gwplot(), richiede un output unilivello, quindi splitto **nn** in tre "sotto-reti", ciascuna per ogni tipologia di vino.
+
+```{r}
+set.seed(123)
+require(neuralnet)
+
+# RETE A
+nn_a <- neuralnet( a  ~ .,
+                 data = train[1:14], 
+                 act.fct = "logistic",
+                 hidden = 3,
+                 linear.output = FALSE,
+                 lifesign = 'full',
+                 likelihood = TRUE )
+
+#RETE B
+nn_b <- neuralnet( b  ~ .,
+                 data = train[- c(14,16)], 
+                 act.fct = "logistic",
+                 hidden = 3,
+                 linear.output = FALSE,
+                 lifesign = 'full',
+                 likelihood = TRUE )
+
+#RETE C
+nn_c <- neuralnet( c  ~ .,
+                 data = train[- c(14,15)], 
+                 act.fct = "logistic",
+                 hidden = 3,
+                 linear.output = FALSE,
+                 lifesign = 'full',
+                 likelihood = TRUE )
+```
+
+
+##### Vino a
+
+```{r}
+par(mfrow=c(2,3))
+gwplot(nn_a, selected.covariate="gradaz")
+gwplot(nn_a, selected.covariate="acido")
+gwplot(nn_a, selected.covariate="ceneri")
+gwplot(nn_a, selected.covariate="alcal")
+gwplot(nn_a, selected.covariate="magn")
+gwplot(nn_a, selected.covariate="fenoli")
+gwplot(nn_a, selected.covariate="flav")
+gwplot(nn_a, selected.covariate="non_flav")
+gwplot(nn_a, selected.covariate="proanto")
+gwplot(nn_a, selected.covariate="intens")
+gwplot(nn_a, selected.covariate="tonal")
+gwplot(nn_a, selected.covariate="purez")
+gwplot(nn_a, selected.covariate="prol")
+```
+
+
+**Osservazioni sulle features per la classificazione del vino a:**
+
+ - tutte le variabili hanno una quota di generalized weights che si assestano su valori nulli, trascurabili;
+ - i range di prolina [0,3], gradazione [0,3], ceneri [0,2], alcalinità ceneri [-3.5,0] e purezza [0,2]; suggeriscono che queste features ricoprono un ruolo più efficace delle altre nella      classificazione del vino a;
+ - i range delle altre features oscillano infatti in range di ampiezza max 1.
+
+
+##### Vino b
+
+```{r}
+ par(mfrow=c(2,3))
+gwplot(nn_b, selected.covariate="gradaz")
+gwplot(nn_b, selected.covariate="acido")
+gwplot(nn_b, selected.covariate="ceneri")
+gwplot(nn_b, selected.covariate="alcal")
+gwplot(nn_b, selected.covariate="magn")
+gwplot(nn_b, selected.covariate="fenoli")
+gwplot(nn_b, selected.covariate="flav")
+gwplot(nn_b, selected.covariate="non_flav")
+gwplot(nn_b, selected.covariate="proanto")
+gwplot(nn_b, selected.covariate="intens")
+gwplot(nn_b, selected.covariate="tonal")
+gwplot(nn_b, selected.covariate="purez")
+gwplot(nn_b, selected.covariate="prol")
+```
+
+**Osservazioni sulle features per la classificazione del vino b:**
+
+ - tutte le variabili hanno una quota di generalized weights che si assestano su valori nulli, trascurabili;
+ - i range di gradazione [-6,0], ceneri [-5,0], alcalinità ceneri [0,4], proantocianidine [0,3], intensità colore [-8,0], tonalità colore [0,4] e prolina [-10,0], segnalano l'importanza di     questa features nella classificazione del vino b;
+ - i range delle alltre features oscillano in range di ampiezza max 2.
+
+##### Vino c
+
+```{r}
+ par(mfrow=c(2,3))
+gwplot(nn_c, selected.covariate="gradaz")
+gwplot(nn_c, selected.covariate="acido")
+gwplot(nn_c, selected.covariate="ceneri")
+gwplot(nn_c, selected.covariate="alcal")
+gwplot(nn_c, selected.covariate="magn")
+gwplot(nn_c, selected.covariate="fenoli")
+gwplot(nn_c, selected.covariate="flav")
+gwplot(nn_c, selected.covariate="non_flav")
+gwplot(nn_c, selected.covariate="proanto")
+gwplot(nn_c, selected.covariate="intens")
+gwplot(nn_c, selected.covariate="tonal")
+gwplot(nn_c, selected.covariate="purez")
+gwplot(nn_c, selected.covariate="prol")
+```
+
+**Osservazioni sulle features per la classificazione del vino c:**
+
+ - tutte le variabili hanno una quota di generalized weights che si assestano su valori nulli, trascurabili;
+ - i range di proantocianidine [-2,0], intensità di colore [0,6], tonalità di colore e purezza [-1.5,0], evidenziano il lororuolo nell'individuazione del vicno c;
+ - i range delle alltre features oscillano in range di ampiezza inferiore ad 1 e sono quindi trascurabili.
+
+
+
+
+### 2. GARSON & OLDEN ALGORITHMS
+
+```{r}
+require(NeuralNetTools)
+```
+
+Anche *NeuralNetTools* richiede reti neurali con un output unilivello, quindi considero nuovamente **nn_a**, **nn_b** e **nn_c**.
+
+```{r}
+plot(nn_a, rep='best')
+```
+
+```{r}
+plot(nn_b, rep='best')
+```
+
+```{r}
+plot(nn_c, rep='best')
+```
+
+**Osservazione per i tre plot sulle reti nn_a, nn_b e nn_c:**
+
+ - la colonna centrale rappresenta i 3 hidden layers,
+ - ogni hidden ha un solo nodo.
+
+
+
+
+**GARSON** 
+
+L'algoritmo di Garson originario, poteva essere utilizzato solo per reti neurali con un solo livello di hidden, tuttavia è stato modificato da Gevrey per renderlo indipendente dal numero di strati nascosti pur mantenedo gli stessi risultati. 
+
+**Algoritmo di Garson:**
+
+ 1. prodotto tra due pesi = (peso della connessione tra il neurone dell’hidden e il neurone l’output) x (peso della connessione tra il neurone dell’hidden e il neurone dell’input);
+ 2. si sommano i prodotti in base a quanti nodi sono presenti all'interno dell'unico hidden -> importanza assoluta di ogni feature;
+ 3. si calcola l'importanza relativa di ogni feature.
+
+**Algoritmo di Gevrey:**
+
+ 1. focus tra feature e primo hidden -> pesi relativi: rapporto tra ciascun peso e la somma dei pesi (considerando solo i pesi che esprimono la relazione tra la feature in questione e i nodi     del primo hidden);
+ 2. somma dei pesi relativi -> importanza assoluta di ogni feature;
+ 3. si calcola l'importanza relativa di ogni feature.
+
+
+
+**OLDEN**
+
+L'algoritmo di Olden è una più robusta revisione di Gevrey, che ha lo svantaggio di tralasciare i pesi tra gli hidden e l'output.
+
+L'algoritmo di Olden è semplicemente costruito come la riproduzione ed estensione dell'algoritmo di Garson a tutti gli hidden di una rete neurale; preservando il segno e la grandezza dell'importanza della feature, quindi senza relativizzazione.
+
+
+
+```{r}
+# Variable Importance Plot
+require(vip)
+```
+
+
+#### Vino a
+```{r}
+grid.arrange(vip(nn_a, type = "garson", aesthetics = list(fill = "palevioletred2")), vip(nn_a, type = "olden",aesthetics = list(fill = "palevioletred4")), nrow = 1,top = "Garson-Gevrey        vs.        Olden")
+```
+
+
+_prolina_, _gradazione_ e _purezza_ sono le variabili determinanti nella classificazione del vino a.
+
+#### Vino b
+```{r}
+grid.arrange(vip(nn_b, type = "garson", aesthetics = list(fill = "palevioletred2")), vip(nn_b, type = "olden",aesthetics = list(fill = "palevioletred4")), nrow = 1,top = "Garson-Gevrey        vs.        Olden")
+```
+
+
+_tonalità di colore_, _alcalinità delle ceneri_ e _proantocianidine_ sono le variabili determinanti nella classificazione del vino b.
+
+
+#### Vino c
+```{r}
+grid.arrange(vip(nn_c, type = "garson", aesthetics = list(fill = "palevioletred2")), vip(nn_c, type = "olden",aesthetics = list(fill = "palevioletred4")), nrow = 1,top = "Garson-Gevrey        vs.        Olden")
+```
+
+
+_intensità di colore_, _magnesio_ e _gradazione_ sono le variabili determinanti nella classificazione del vino c.
+
+### CONFRONTO TRA I DUE METODI DI FEATURE IMPORTANCE
+
+**Per il vino c:**
+
+ - GW -> alcalinità, prolina, gradazione
+-  Olden -> prolina, gradazione, purezza
+
+**Per il vino b:**
+
+ - GW- >intensità colore, gradazione, alcalinità ceneri 
+ - Olden -> tonalità colore, alcalinità ceneri, proantocianidine
+
+**Per il vino c:**
+
+ - GW -> intensità colore, proantocianidine, tonalità colore
+ - Olden -> intensità colore, magnesio, gradazione
+
+
+**Intrecciando i risultati delle due analisi, si può concludere che:**
+
+ * prolina e gradazione sono determinanti nella classificazione del vino a,
+ * alcalinità delle ceneri è determinante nella classificazione del vino b,
+ * intensità di colore è determinante nella classificazione del vino c,
+ * purezza, tonalità colore, proantocianidine e magnesio sono le features che, oltre alle precedenti, concorrono più delle altre alla classificazione dei vini. 
+
+
+
+
+# PREDICTIONS
+
+
+##### Expected Output vs. Predicted Output
+
+```{r}
+table =cbind ( train[14:16], as.data.frame(nn$net.result) )
+colnames(table) = c( "Expected Output - a","Expected Output - b", "Expected Output - c",
+                     "Neural Net Output - a","Neural Net Output - b", "Neural Net Output - c" )
+head(table)
+```
+
+
+##### Accuracy (training set) 
+
+L'*accuracy* è il numero di previsioni corrette sul totale delle previsioni.
+
+Più formalmente, è definita come rapporto tra (True Positives + True negatives) e 
+(True Positives + True Negatives + False Positives + False negatives).
+
+Ovviamente, sul Training Set l'accuracy sarà molto alta, perchè è il set di dati su cui la rete effettua l'addestramento.
+
+
+```{r}
+require(dplyr)
+predictions <- neuralnet::compute (nn, train[, 1:13])
+target_original <- max.col(train[, 14:16])
+target_predicted <- max.col(predictions$net.result)
+mean(target_predicted == target_original)
+```
+
+# EVALUATION nn
+
+### Cross Validation
+
+Con ciclo for valido la rete neurale ripetendo da 1 a 1000 volte il modello nn_test sul Test Set, calcolando tramite le predictions l'accuracy.
+
+La misura definitiva di accuracy sul Test Set viene calcolata come media delle 1000 accuracy prodotte con il ciclo for.
+
+```{r}
+set.seed(123)
+acc <- NULL
+
+for(i in 1:1000)
+{
+  
+require(neuralnet)
+nn_test <- neuralnet((a + b + c) ~ ., data = test, hidden = c(13, 3, 3), act.fct = "logistic",linear.output = FALSE)
+
+predictions_test <- neuralnet::compute (nn_test, test[, 1:13])
+
+target_original_test <- max.col(test[, 14:16])
+target_predicted_test <- max.col(predictions_test$net.result)
+acc[i] <- mean(target_original_test == target_predicted_test)
+}
+print( mean(acc))
+```
+
+
+
+### Confusion Matrix
+
+Una Confusion Matrix è una matrice k x k che valuta le prestazioni di un modello di classificazione.
+
+K è il numero di classi del target, quindi in questo caso k = 3.
+
+La matrice confronta i valori target effettivi con quelli previsti dal modello neuronale, quindi presenta:
+
+ - sulla diagonale principale le classificazioni corrette,
+ - al di fuori della diagonale le classificazioni errate.
+
+```{r}
+confusion_test <-table (target_original_test,target_predicted_test)
+confusion_test
+```
+
+In questo studio, l'accuratezza della Neural Network è del **99.95%**.
+
+
+
+### Accuracy 
+
+```{r}
+accuracy_test <- round ( ( sum(diag(confusion_test)) / nrow(test) ) , 2 )
+accuracy_test
+```
+
+
+
+
+
+# EVALUATION nn_a
+
+### Cross Validation
+
+```{r}
+set.seed(123)
+test_a<-as.data.frame(test[1:14])
+a_acc <- NULL
+
+for(i in 1:1000)
+{
+  
+require(neuralnet)
+nn_test_a <- neuralnet((a) ~ ., data = test_a, hidden = c(13, 3, 3), act.fct = "logistic",linear.output = FALSE)
+
+predictions_test_a <- neuralnet::compute (nn_test_a, test_a[, 1:13])
+
+target_original_test_a <- max.col(test_a[, 14])
+target_predicted_test_a <- max.col(predictions_test_a$net.result)
+a_acc[i] <- mean(target_original_test_a == target_predicted_test_a)
+}
+print( mean(a_acc))
+```
+### Confusion Matrix
+
+```{r}
+confusion_a <-table (target_original_test_a,target_predicted_test_a)
+confusion_a
+```
+### Accuracy 
+
+```{r}
+accuracy_test_a <- round ( ( sum(diag(confusion_a)) / nrow(test) ) , 2 )
+accuracy_test_a
+```
+
+
+# EVALUATION nn_b
+
+### Cross Validation
+
+```{r}
+set.seed(123)
+test_b<-as.data.frame(test[- c(14,16)])
+b_acc <- NULL
+
+for(i in 1:1000)
+{
+  
+require(neuralnet)
+nn_test_b <- neuralnet((b) ~ ., data = test_b, hidden = c(13, 3, 3), act.fct = "logistic",linear.output = FALSE)
+
+predictions_test_b <- neuralnet::compute (nn_test_b, test_b[, 1:13])
+
+target_original_test_b <- max.col(test_b[, 14])
+target_predicted_test_b <- max.col(predictions_test_b$net.result)
+b_acc[i] <- mean(target_original_test_b == target_predicted_test_b)
+}
+print( mean(b_acc))
+```
+### Confusion Matrix
+
+```{r}
+confusion_b <-table (target_original_test_b,target_predicted_test_b)
+confusion_b
+```
+### Accuracy 
+
+```{r}
+accuracy_test_b <- round ( ( sum(diag(confusion_b)) / nrow(test) ) , 2 )
+accuracy_test_b
+```
+
+
+# EVALUATION nn_c
+
+### Cross Validation
+
+```{r}
+set.seed(123)
+test_c<-as.data.frame(test[- c(14,15)])
+c_acc <- NULL
+
+for(i in 1:1000)
+{
+  
+require(neuralnet)
+nn_test_c <- neuralnet((c) ~ ., data = test_c, hidden = c(13, 3, 3), act.fct = "logistic",linear.output = FALSE)
+
+predictions_test_c <- neuralnet::compute (nn_test_c, test_c[, 1:13])
+
+target_original_test_c <- max.col(test_c[,14])
+target_predicted_test_c <- max.col(predictions_test_c$net.result)
+c_acc[i] <- mean(target_original_test_c == target_predicted_test_c)
+}
+print( mean(c_acc))
+```
+### Confusion Matrix
+
+```{r}
+confusion_c <-table (target_original_test_c,target_predicted_test_c)
+confusion_c
+```
+### Accuracy 
+
+```{r}
+accuracy_test_c <- round ( ( sum(diag(confusion_c)) / nrow(test) ) , 2 )
+accuracy_test_c
+```
